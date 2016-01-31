@@ -1,0 +1,3 @@
+-- This chapter is a short overview of the basics of
+-- the Lambda Calculus. Since I'd already read Greg Michaelson's
+-- book on the subject, this was a quick review.
