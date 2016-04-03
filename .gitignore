@@ -2,3 +2,4 @@
 *.o
 *.pdf
 .hs-tags
+*.stack-work
