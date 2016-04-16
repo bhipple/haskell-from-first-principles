@@ -17,6 +17,18 @@ library
   hs-source-dirs:      src
   exposed-modules:     Morse
   build-depends:       base >= 4.7 && < 5
+                     , containers
+                     , QuickCheck
+  default-language:    Haskell2010
+
+executable morse-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , morse
+                     , hspec
+                     , QuickCheck
   default-language:    Haskell2010
 
 test-suite morse-test
@@ -25,6 +37,8 @@ test-suite morse-test
   main-is:             Spec.hs
   build-depends:       base
                      , morse
+                     , containers
+                     , QuickCheck
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
