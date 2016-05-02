@@ -1,8 +1,11 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Ch15 where
 import Data.Semigroup
 import Data.Monoid (First, Last)
 import Data.Bifunctor
+import Generics.Deriving
 
 import Test.QuickCheck
 import Test.QuickCheck.Gen
@@ -246,12 +249,11 @@ snd1' = Snd 1 <> Snd 2
 
 -- Here, we'll have only one a value, but multiple functions
 -- capable of producing b values that need to be combined.
-newtype Combine a b = Combine { unCombine :: (a -> b) }
+newtype Combine a b = Combine { unCombine :: a -> b }
+    deriving Generic
 
 instance Semigroup b => Semigroup (Combine a b) where
-    _ <> _ = undefined
-    -- Doesn't work because we can't compose two functions :: a -> b
-    --(Combine f) <> (Combine g) = Combine (f . g)
+    f <> g = Combine $ unCombine f <> unCombine g
 
 -- Here, we have :: Combine Integer (Sum Integer)
 f = Combine $ \n -> Sum (n + 1)
@@ -261,7 +263,62 @@ sum2 = unCombine (f <> g) 1
 sum4 = unCombine (f <> f) 1
 sum2' = unCombine (g <> f) 1
 
---ex9a = 
+{--- TODO: Figure out the CoArbitrary instance and other dependent instances to
+-- get this usable with quickcheck
+instance Eq (Combine Int (Sum Int))
+instance Show (Combine Int (Sum Int))
+instance CoArbitrary (Sum Int)
+instance CoArbitrary (Combine Int (Sum Int))
+
+e9 = quickCheck (semigroupAssoc :: Combine Int (Sum Int)
+                                  -> Combine Int (Sum Int)
+                                  -> Combine Int (Sum Int)
+                                  -> Bool)
+-}
+
+newtype Comp a = Comp { unComp :: a -> a }
+
+instance Semigroup (Comp a) where
+    (Comp f) <> (Comp g) = Comp (f . g)
 
 
-checks = assoc >> lIdent >> rIdent >> isAssoc >> e1 >> e2 >> e6 >> e8
+data Validation a b = Failure' a | Success' b
+    deriving (Eq, Show)
+
+instance Semigroup a => Semigroup (Validation a b) where
+    (Failure' a) <> (Failure' a') = Failure' (a <> a')
+    (Failure' a) <> _ = Failure' a
+    _ <> (Failure' a) = Failure' a
+    (Success' b) <> (Success' b') = Success' b'
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Validation a b) where
+    arbitrary = oneof [Failure' <$> arbitrary, Success' <$> arbitrary]
+
+e11 = quickCheck (semigroupAssoc :: Validation String Int
+                                    -> Validation String Int
+                                    -> Validation String Int
+                                    -> Bool)
+
+newtype AccumulateRight a b = AccumulateRight (Validation a b)
+    deriving (Eq, Show)
+
+instance Semigroup b => Semigroup (AccumulateRight a b) where
+    AccumulateRight (Success' b) <> AccumulateRight (Success' b') = AccumulateRight (Success' (b <> b'))
+    AccumulateRight (Success' a) <> _ = AccumulateRight (Success' a)
+    AccumulateRight _ <> b = b
+
+newtype AccumulateBoth a b = AccumulateBoth (Validation a b)
+    deriving (Eq, Show)
+
+instance (Semigroup a, Semigroup b) => Semigroup (AccumulateBoth a b) where
+    AccumulateBoth (Success' b) <> AccumulateBoth (Success' b') = AccumulateBoth (Success' (b <> b'))
+    AccumulateBoth (Failure' a) <> AccumulateBoth (Failure' a') = AccumulateBoth (Failure' (a <> a'))
+    AccumulateBoth (Failure' a) <> _ = AccumulateBoth (Failure' a)
+    _ <> b = b
+
+checks = assoc >> lIdent >> rIdent >> isAssoc >> e1 >> e2 >> e6 >> e8 >> e11
+
+-- ============================================================================
+--                             Monoid Exercises
+-- ============================================================================
+
