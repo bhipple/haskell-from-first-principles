@@ -3,3 +3,4 @@
 *.pdf
 .hs-tags
 *.stack-work
+.DS_Store

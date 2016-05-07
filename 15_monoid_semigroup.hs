@@ -1,15 +1,14 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
 module Ch15 where
 import Data.Semigroup
-import Data.Monoid (First, Last)
+import Data.Monoid (First, Last, Sum, Product)
 import Data.Bifunctor
 import Generics.Deriving
 
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Function
+import Test.HUnit
 
 -- ============================================================================
 --                                  Monoids
@@ -77,13 +76,13 @@ prop_funcAssoc (<>) a b c = a <> (b <> c) == (a <> b) <> c
 prop_monoidAssoc :: (Eq m, Semigroup m) => m -> m -> m -> Bool
 prop_monoidAssoc a b c = (a <> (b <> c)) == ((a <> b) <> c)
 
-prop_leftIdentity :: (Eq m, Semigroup m, Monoid m) => m -> Bool
-prop_leftIdentity a = (a <> mempty) == a
+monoidLeftIdent :: (Eq m, Semigroup m, Monoid m) => m -> Bool
+monoidLeftIdent a = (a <> mempty) == a
 
-prop_rightIdentity :: (Eq m, Semigroup m, Monoid m) => m -> Bool
-prop_rightIdentity a = (mempty <> a) == a
+monoidRightIdent :: (Eq m, Semigroup m, Monoid m) => m -> Bool
+monoidRightIdent a = (mempty <> a) == a
 
-ok = quickCheck (prop_leftIdentity :: String -> Bool)
+ok = quickCheck (monoidLeftIdent :: String -> Bool)
 
 -- Example of something failing
 data Bull = Fools | Twoo deriving (Eq, Show)
@@ -101,8 +100,8 @@ instance Monoid Bull where
 type BullMappend = Bull -> Bull -> Bull -> Bool
 
 pass1 = quickCheck (prop_monoidAssoc :: BullMappend)
-fail2 = quickCheck (prop_leftIdentity :: Bull -> Bool)
-fail3 = quickCheck (prop_rightIdentity :: Bull -> Bool)
+fail2 = quickCheck (monoidLeftIdent :: Bull -> Bool)
+fail3 = quickCheck (monoidRightIdent :: Bull -> Bool)
 
 -- Writing a monoid instance for a maybe that doesn't depend on the subtype
 -- being a monoid
@@ -123,8 +122,8 @@ instance Arbitrary a => Arbitrary (First' a) where
     arbitrary = oneof [fmap First' arbitrary]
 
 assoc = quickCheck (prop_monoidAssoc :: First' Bull -> First' Bull -> First' Bull -> Bool)
-lIdent = quickCheck (prop_leftIdentity :: First' Bull -> Bool)
-rIdent = quickCheck (prop_rightIdentity :: First' Bull -> Bool)
+lIdent = quickCheck (monoidLeftIdent :: First' Bull -> Bool)
+rIdent = quickCheck (monoidRightIdent :: First' Bull -> Bool)
 
 type FirstMappend = First' String -> First' String -> First' String -> Bool
 isAssoc = quickCheck (prop_monoidAssoc :: FirstMappend)
@@ -175,6 +174,9 @@ e1 = quickCheck (semigroupAssoc :: Trivial -> Trivial -> Trivial -> Bool)
 instance (Arbitrary a) => Arbitrary (Sum a) where
     arbitrary = Sum <$> arbitrary
 
+instance (Arbitrary a) => Arbitrary (Product a) where
+    arbitrary = Product <$> arbitrary
+
 newtype Identity a = Identity a
     deriving (Eq, Show)
 
@@ -194,19 +196,16 @@ data Two a b = Two a b
 instance Bifunctor Two where
     bimap f g (Two a b) = Two (f a) (g b)
 
--- TODO: I need to figure out how to write an arbitrary def for Two
-{-instance (Arbitrary a, Arbitrary b) => Arbitrary (Two a b) where-}
-    {-arbitrary = Two <$> a' <*> b'-}
-                {-where a' = arbitrary :: a-}
-                      {-b' = arbitrary :: b-}
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Two a b) where
+    arbitrary = Two <$> arbitrary <*> arbitrary
 
 instance (Semigroup a, Semigroup b) => Semigroup (Two a b) where
     (Two x y) <> (Two x' y') = Two (x <> x') (y <> y')
 
-{-e3 = quickCheck (semigroupAssoc :: Two (Sum Int) (Sum Int) ->-}
-                                   {-Two (Sum Int) (Sum Int) ->-}
-                                   {-Two (Sum Int) (Sum Int) ->-}
-                                   {-Bool)-}
+e3 = quickCheck (semigroupAssoc :: Two (Product Int) (Sum Int) ->
+                                   Two (Product Int) (Sum Int) ->
+                                   Two (Product Int) (Sum Int) ->
+                                   Bool)
 
 data Three a b c = Three a b c
     deriving (Eq, Show)
@@ -214,9 +213,7 @@ data Three a b c = Three a b c
 instance (Semigroup a, Semigroup b, Semigroup c) => Semigroup (Three a b c) where
     (Three a b c) <> (Three a' b' c') = Three (a <> a') (b <> b') (c <> c')
 
-
-newtype BoolConj = BoolConj Bool
-    deriving (Eq, Show)
+newtype BoolConj = BoolConj Bool deriving (Eq, Show)
 
 instance Semigroup BoolConj where
     (BoolConj True) <> (BoolConj True) = BoolConj True
@@ -255,7 +252,7 @@ newtype Combine a b = Combine { unCombine :: a -> b }
 instance Semigroup b => Semigroup (Combine a b) where
     f <> g = Combine $ unCombine f <> unCombine g
 
--- Here, we have :: Combine Integer (Sum Integer)
+f :: Combine Integer (Sum Integer)
 f = Combine $ \n -> Sum (n + 1)
 g = Combine $ \n -> Sum (n - 1)
 sum0 = unCombine (f <> g) 0
@@ -316,9 +313,87 @@ instance (Semigroup a, Semigroup b) => Semigroup (AccumulateBoth a b) where
     AccumulateBoth (Failure' a) <> _ = AccumulateBoth (Failure' a)
     _ <> b = b
 
-checks = assoc >> lIdent >> rIdent >> isAssoc >> e1 >> e2 >> e6 >> e8 >> e11
+checks = assoc >> lIdent >> rIdent >> isAssoc >> e1 >> e2 >> e3 >> e6 >> e8 >> e11
 
 -- ============================================================================
 --                             Monoid Exercises
 -- ============================================================================
+checkMonoid :: (Eq t, Show t, Arbitrary t, Semigroup t, Monoid t) => t -> IO ()
+checkMonoid t = do
+    quickCheck (semigroupAssoc t)
+    quickCheck (monoidLeftIdent t)
+    quickCheck (monoidRightIdent t)
 
+instance Monoid Trivial where
+    mempty = Trivial
+    mappend = (<>)
+
+m1 = checkMonoid Trivial
+
+instance (Semigroup a, Monoid a) => Monoid (Identity a) where
+    mempty = Identity mempty
+    mappend = (<>)
+
+m2 = checkMonoid (Identity (Product 5 :: Product Integer))
+
+instance (Semigroup a, Semigroup b, Monoid a, Monoid b) => Monoid (Two a b) where
+    mempty = Two mempty mempty
+    mappend = (<>)
+
+m3 = checkMonoid (Two ("Foo" :: String) (Product 5 :: Product Integer))
+
+instance Monoid BoolConj where
+    mempty = BoolConj True
+    mappend = (<>)
+
+m4 = checkMonoid (BoolConj True)
+
+instance (Semigroup a, Semigroup b, Monoid a, Monoid b) => Monoid (Combine a b) where
+    mempty = Combine (unCombine mempty)
+    mappend = (<>)
+
+mchk = m1 >> m2 >> m3 >> m4
+
+-- Exercise 8
+newtype Mem s a =
+    Mem {
+        runMem :: s -> (a, s)
+    }
+
+-- a is a semigroup so we can use mconcat
+-- s is a function, so it has to be chained
+-- So, what we need to do is give the input to on
+instance Semigroup a => Semigroup (Mem s a) where
+    -- Compiles but discards x; essentially treats x as mempty
+    -- x <> y = Mem $ \s -> runMem y s
+    -- Does the same as above, but discards y
+    -- x <> y = Mem $ \s -> runMem x s
+    --
+    -- We take the input value, and we get a new a by running both x and y
+    -- and <> their fst results.  We get a new s by running the input value
+    -- through x and sending it as the result to y, and taking the snd value.
+    -- There's probably a much cleaer, nicer way to do this ... revisit someday.
+    x <> y = Mem $ \s -> (fst (xpair s) <> fst (ypair s), snd $ ypair (snd $ xpair s))
+        where xpair = runMem x
+              ypair = runMem y
+
+instance (Semigroup a, Monoid a) => Monoid (Mem s a) where
+    mempty = Mem $ \s -> (mempty, s)
+    mappend = (<>)
+
+f' :: Mem Int String
+f' = Mem $ \s -> ("fMon", s + 1)
+
+g' :: Mem Int String
+g' = Mem $ \s -> ("gMon", s + 100)
+
+res = runTestTT $ test
+    [ "t1" ~: "runMem (f' <> mempty) 0" ~: ("fMon",1) ~=? runMem (f' <> mempty) 0
+    , "t2" ~: "runMem (mempty <> f') 0" ~: ("fMon",1) ~=? runMem (mempty <> f') 0
+    , "t3" ~: "runMem mempty 0" ~: ("",0) ~=? (runMem mempty 0 :: (String, Int))
+    , "t4" ~: "runMem (f' <> mempty) 0 == runMem f' 0" ~:
+                    runMem (f' <> mempty) 0 ~=? runMem f' 0
+    , "t5" ~: "runMem (mempty <> f') 0 == runMem f' 0" ~:
+                    runMem (mempty <> f') 0 ~=? runMem f' 0
+    , "t6" ~: "runMem (f' <> g') 0" ~: ("fMongMon", 101) ~=? runMem (f' <> g') 0
+    ]
