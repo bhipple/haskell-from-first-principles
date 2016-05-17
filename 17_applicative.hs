@@ -246,6 +246,10 @@ instance Eq a => EqProp (ZipList' a) where
 instance Functor ZipList' where
     fmap f (ZipList' xs) = ZipList' $ fmap f xs
 
+cycleList :: List a -> List a
+cycleList Nil = Nil
+cycleList xs = xs' where xs' = xs <> xs'
+
 zipLists :: List (a -> b) -> List a -> List b
 zipLists Nil _ = Nil
 zipLists _ Nil = Nil
@@ -253,7 +257,7 @@ zipLists (Cons f fs) (Cons y ys) = Cons (f y) (zipLists fs ys)
 
 instance Applicative ZipList' where
     pure = const (ZipList' Nil)
-    ZipList' fs <*> ZipList' ys = ZipList' $ zipLists fs ys
+    ZipList' fs <*> ZipList' ys = ZipList' $ zipLists (cycleList fs) ys
 
 zvals = ZipList' $ Cons 1 (Cons 2 (Cons 3 (Cons 4 Nil)))
 zfuncs = ZipList' $ Cons (+1) (Cons (+2) (Cons (+3) Nil))
@@ -270,8 +274,6 @@ instance Arbitrary a => Arbitrary (List a) where
 instance Arbitrary a => Arbitrary (ZipList' a) where
     arbitrary = ZipList' <$> arbitrary
 
---q4 = quickBatch $ applicative (undefined :: [(String, String, Int)])
--- TODO: For some reason, the above compiles but the below does not ...
---q4 = quickBatch $ applicative (undefined :: ZipList' (List Int))
+q4 = quickBatch $ applicative (undefined :: ZipList' (Int, Int, List Int))
 
-qchecks = q1 >> q2 >> q3 -- >> q4
+qchecks = q1 >> q2 >> q3 >> q4
