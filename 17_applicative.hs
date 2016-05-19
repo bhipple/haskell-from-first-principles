@@ -256,12 +256,13 @@ zipLists _ Nil = Nil
 zipLists (Cons f fs) (Cons y ys) = Cons (f y) (zipLists fs ys)
 
 instance Applicative ZipList' where
-    pure = const (ZipList' Nil)
+    pure x = ZipList' (Cons x Nil)
     ZipList' fs <*> ZipList' ys = ZipList' $ zipLists (cycleList fs) ys
 
 zvals = ZipList' $ Cons 1 (Cons 2 (Cons 3 (Cons 4 Nil)))
 zfuncs = ZipList' $ Cons (+1) (Cons (+2) (Cons (+3) Nil))
 zdemo = zfuncs <*> zvals
+zid = pure id <*> zvals
 
 instance Arbitrary a => Arbitrary (List a) where
     arbitrary = frequency [(1, return Nil),
