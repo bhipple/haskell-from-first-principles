@@ -1,5 +1,5 @@
 module Ch17 where
-import Control.Applicative (liftA2)
+import Control.Applicative (liftA2, liftA3)
 import Data.List (elemIndex)
 import Data.Monoid
 
@@ -275,6 +275,78 @@ instance Arbitrary a => Arbitrary (List a) where
 instance Arbitrary a => Arbitrary (ZipList' a) where
     arbitrary = ZipList' <$> arbitrary
 
+-- TODO: ZipList' is failing composition and interchange laws
 q4 = quickBatch $ applicative (undefined :: ZipList' (Int, Int, List Int))
 
-qchecks = q1 >> q2 >> q3 >> q4
+-- Either Applicative
+data Either' a b = Left' a | Right' b
+    deriving (Eq, Show)
+
+instance Functor (Either' a) where
+    fmap _ (Left' x) = Left' x
+    fmap f (Right' a) = Right' (f a)
+
+instance Applicative (Either' b) where
+    pure = Right'
+    Left' x <*> _ = Left' x
+    _ <*> Left' x = Left' x
+    Right' x <*> Right' y = Right' (x y)
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Either' a b)  where
+    arbitrary = frequency [(1, Left' <$> arbitrary),
+                           (3, Right' <$> arbitrary)]
+
+instance (Eq a, Eq b) => EqProp (Either' a b)
+    where (=-=) = eq
+
+q5 = quickBatch $ applicative (undefined :: (Either' String) (Int, Int, Int))
+
+-- Validation Applicative, which is the same as Either except it takes monoidal
+-- errors and combines them.
+data Validation e a =
+    Error' e
+  | Success' a
+  deriving (Eq, Show)
+
+instance Functor (Validation e) where
+    fmap _ (Error' e) = Error' e
+    fmap f (Success' a) = Success' (f a)
+
+instance (Monoid e) => Applicative (Validation e) where
+    pure = Success'
+    Success' f <*> Success' a = Success' (f a)
+    Error' e1 <*> Error' e2 = Error' (e1 <> e2)
+    _ <*> Error' e = Error' e
+    Error' e <*> _ = Error' e
+
+instance (Arbitrary e, Arbitrary a) => Arbitrary (Validation e a) where
+    arbitrary = frequency [(1, Error' <$> arbitrary)
+                          ,(3, Success' <$> arbitrary)]
+
+instance (Eq a, Eq b) => EqProp (Validation a b)
+    where (=-=) = eq
+
+q6 = quickBatch $ applicative (undefined :: (Validation String) (String, Int, Int))
+
+v1 = Error' "Error A; " :: Validation String (Int -> Int)
+v2 = Error' "Error B; " :: Validation String Int
+v3 = Success' (+5) :: Validation String (Int -> Int)
+v4 = Success' 3 :: Validation String Int
+
+f1 = v1 <*> v2
+s1 = v3 <*> v4
+f2 = v3 <*> v2
+
+qchecks = q1 >> q2 >> q3 >> q4 >> q5 >> q6
+
+--  ===========================================================================
+--                          Chapter Exercises
+--  ===========================================================================
+combos :: [a] -> [b] -> [c] -> [(a, b, c)]
+combos = liftA3 (,,)
+
+stops, vowels :: String
+stops = "xyz"
+vowels = "aeiou"
+
+stopsVowelsStops = combos stops vowels stops
