@@ -350,3 +350,6 @@ stops = "xyz"
 vowels = "aeiou"
 
 stopsVowelsStops = combos stops vowels stops
+
+-- TODO: Come back to the writing of other Applicative instances as a refresher
+-- later.
