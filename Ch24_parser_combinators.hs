@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-module Ch24 where
+module Ch24_parser_combinators where
 -- A Parser Combinator is a higher-order function that takes parsers as input
 -- and returns a new parser as output.
 -- Combinators are expressions with no free variables
