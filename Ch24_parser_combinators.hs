@@ -8,18 +8,21 @@ import Text.Trifecta
 import Text.Parser.Combinators
 
 import Control.Applicative
-import Data.Ratio ((%))
+import Data.Aeson hiding (Result, Success)
+import Data.Attoparsec.Text (parseOnly)
+import Data.Char (digitToInt)
 import Data.ByteString (ByteString)
 import Data.Char (isAlpha)
 import Data.Map (Map)
-import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
+import Data.Monoid
+import Data.Ratio ((%))
+import Data.String (IsString)
 import Data.Text (Text)
-import qualified Data.Text.IO as TIO
 import Test.Hspec
 import Text.RawString.QQ
-import Data.Attoparsec.Text (parseOnly)
-import Data.String (IsString)
-import Data.Aeson hiding (Result, Success)
+import qualified Data.Map as M
+import qualified Data.Text.IO as TIO
 
 import qualified Data.ByteString.Lazy as LBS
 
@@ -324,7 +327,7 @@ demo4 = do
 --                          Chapter Exercises
 --  ===========================================================================
 -- Parser for Semantic Versions
-data NumberOrString = NOSS String | NOSI Integer
+data NumberOrString = NOSI Integer | NOSS String
     deriving (Eq, Ord, Show)
 
 type Major = Integer
@@ -334,13 +337,115 @@ type Release = [NumberOrString]
 type Metadata = [NumberOrString]
 
 data SemVer = SemVer Major Minor Patch Release Metadata
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Show)
+
+instance Ord SemVer where
+    compare (SemVer maj min p r m) (SemVer maj' min' p' r' m') =
+        mconcat [ compare maj maj
+                , compare min min
+                , compare p p'
+                , compareRelease r r'
+                ]
+
+-- If one has no release metadata at all, it's greater
+-- 1.2.3 > 1.2.3-beta
+compareRelease :: [NumberOrString] -> [NumberOrString] -> Ordering
+compareRelease [] (x:xs) = GT
+compareRelease (x:xs) [] = LT
+compareRelease x y = compareRelease' x y
+
+-- If they're all the same but one has more components, it's greater
+-- 1.2.3-alpha.5.1 > 1.2.3-alpha.5 > 1.2.3-alpha.1
+compareRelease' :: [NumberOrString] -> [NumberOrString] -> Ordering
+compareRelease' [] (x:xs) = LT
+compareRelease' (x:xs) [] = GT
+compareRelease' (x:xs) (y:ys) = mconcat [compare x y, compareRelease' xs ys]
 
 parseSemVer :: Parser SemVer
-parseSemVer = undefined
+parseSemVer = do
+    major <- decimal
+    char '.'
+    minor <- decimal
+    char '.'
+    patch <- decimal
+    release <- optional $ char '-' >> parseTags
+    metadata <- optional $ char '+' >> parseTags
+    return $ SemVer major minor patch
+                    (fromMaybe [] release)
+                    (fromMaybe [] metadata)
+
+parseTags :: Parser [NumberOrString]
+parseTags = sepBy1 parseNOS (char '.')
+
+parseNOS :: Parser NumberOrString
+parseNOS = NOSI <$> decimal <|> NOSS <$> some letter
 
 ts1 = parseString parseSemVer mempty "2.1.1"
 ts2 = parseString parseSemVer mempty "1.0.0-x.7.z.92"
-ts3True = SemVer 2 1 1 [] [] > SemVer 2 1 0 [] []
 
--- TODO: Come back to this later
+-- Test cases from semver.org, plus a few of my own.
+passes = monotonicallyIncreasing [ SemVer 1 0 0 [ NOSI 1 ] []
+                                 , SemVer 1 0 0 [ NOSS "alpha", NOSI 1 ] []
+                                 , SemVer 1 0 0 [ NOSS "alpha", NOSS "beta" ] []
+                                 , SemVer 1 0 0 [ NOSS "beta" ] []
+                                 , SemVer 1 0 0 [ NOSS "beta", NOSI 2 ] []
+                                 , SemVer 1 0 0 [ NOSS "beta", NOSI 11 ] []
+                                 , SemVer 1 0 0 [ NOSS "rc", NOSI 1 ] []
+                                 , SemVer 1 0 0 [] []
+                                 , SemVer 2 1 0 [] []
+                                 , SemVer 2 1 1 [] []
+                                 , SemVer 2 1 0 [ NOSS "beta" ] []
+                                 ]
+
+monotonicallyIncreasing :: Ord a => [a] -> Bool
+monotonicallyIncreasing [] = True
+monotonicallyIncreasing [x] = True
+monotonicallyIncreasing (x:y:ys) = case compare x y of
+           GT -> False
+           EQ -> False
+           LT -> monotonicallyIncreasing ys
+
+
+-- Writing a parser for integers, without using any of the built-ins
+parseDigit :: Parser Char
+parseDigit = char '1'
+    <|> char '2'
+    <|> char '3'
+    <|> char '4'
+    <|> char '5'
+    <|> char '6'
+    <|> char '7'
+    <|> char '8'
+    <|> char '9'
+    <|> char '0'
+
+base10Integer :: Parser Integer
+base10Integer = do
+    nums <- some parseDigit
+    return $ toNum 0 nums
+
+toInt :: Char -> Integer
+toInt = toInteger . digitToInt
+
+toNum :: Integer -> String -> Integer
+toNum acc [x] = 10*acc + toInt x
+toNum acc (x:xs) = toNum (10*acc + toInt x) xs
+
+success1 = parseString parseDigit mempty "123"
+success123 = parseString base10Integer mempty "123"
+success123' = parseString base10Integer mempty "123abc"
+fail1 = parseString base10Integer mempty "abc"
+
+-- Handles negative numbers
+base10Integer' :: Parser Integer
+base10Integer' = do
+     n <- optional (char '-')
+     x <- base10Integer
+     case n of
+        Nothing -> return x
+        _ -> return (-x)
+
+success123n = parseString base10Integer' mempty "-123abc"
+success123p = parseString base10Integer' mempty "123abc"
+
+-- TODO: There are many more exercises to come back to later if I feel I need more practice.
