@@ -17,6 +17,7 @@ library
   hs-source-dirs:      .
   exposed-modules:     Ch24_parser_combinators
                      , Ch25_composing_types
+                     , Ch26_monad_transformers
                      , GitTest
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
