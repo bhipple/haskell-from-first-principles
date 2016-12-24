@@ -32,7 +32,9 @@ library
                      , hspec
                      , parsers
                      , raw-strings-qq
+                     , scotty
                      , text
+                     , transformers
                      , trifecta
   -- For hlibgit2
   include-dirs:        .
