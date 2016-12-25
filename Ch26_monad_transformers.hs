@@ -1,4 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- Monad Transformers in practice.
 module Ch26_monad_transformers where
 
