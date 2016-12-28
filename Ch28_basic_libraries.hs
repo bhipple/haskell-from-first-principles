@@ -175,3 +175,73 @@ mutableUpdateST n = runST $ do
     go n mvec
         where go 0 v = V.freeze v
               go n v = MV.write v n 0 >> go (n-1) v
+
+--  ===========================================================================
+--                          Strings and Text
+--  ===========================================================================
+-- Text encodes in UTF-16.
+-- Don't use ByteString.Char8; it's there for ASCII-only data, and you usually
+-- want Unicode with ByteString.UTF8.
+
+--  ===========================================================================
+--                          Chapter Exercises
+--  ===========================================================================
+--  A Difference List is a simpler Sequence data structure that specifically
+--  addresses the slow appending problem.
+--  cons, snoc, and append all take O(1) time. toList takes O(n) time, of course.
+--  We do this through function composition.
+newtype DList a = DL { unDL :: [a] -> [a] }
+
+{-# INLINE empty #-}
+empty :: DList a
+empty = DL id
+
+{-# INLINE singleton #-}
+singleton :: a -> DList a
+singleton = DL . (:)
+
+-- Type note: ($[]) :: ([a] -> b) -> b generally, but in this case it's
+-- ($[]) :: ([a] -> [a]) -> [a]
+{-# INLINE toList #-}
+toList :: DList a -> [a]
+toList = ($[]) . unDL
+
+{-# INLINE cons #-}
+infixr `cons`
+cons :: a -> DList a -> DList a
+cons x xs = DL ((x:) . unDL xs)
+
+{-# INLINE snoc #-}
+infixr `snoc`
+snoc :: DList a -> a -> DList a
+snoc xs x = DL $ unDL xs . (x:)
+
+{-# INLINE append #-}
+append :: DList a -> DList a -> DList a
+append xs ys = DL $ unDL xs . unDL ys
+
+
+schlemiel :: Int -> [Int]
+schlemiel i = go i []
+    where go 0 xs = xs
+          go n xs = go (n-1) ([n] ++ xs)
+
+constructDlist :: Int -> [Int]
+constructDlist i = toList $ go i empty
+    where go 0 xs = xs
+          go n xs = go (n-1) (singleton n `append` xs)
+
+-----------------
+-- A simple Queue
+data Queue a = Queue { enqueue :: [a]
+                     , dequeue :: [a]
+                     } deriving (Eq, Show)
+
+push :: a -> Queue a -> Queue a
+push x (Queue e d) = Queue (x:e) d
+
+pop :: Queue a -> Maybe (a, Queue a)
+pop (Queue e d) = case (e, d) of
+    ([], []) -> Nothing
+    (e, []) -> pop (Queue [] (reverse e))
+    (e, d:ds) -> Just (d, Queue e ds)

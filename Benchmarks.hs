@@ -61,7 +61,19 @@ vectorBenchmarks =
         whnf mutableUpdateST 9998
     ]
 
+differenceListBenchmarks :: [Benchmark]
+differenceListBenchmarks =
+    [ bench "concat list" $ whnf schlemiel 123456
+    , bench "concat dlist gives roughly 2x speedup" $ whnf constructDlist 123456
+    ]
+
+-- TODO: Benchmark the queue against a regular list, and make sure it works.
+queueBenchmarks :: [Benchmark]
+queueBenchmarks = []
+
 main :: IO ()
 main = defaultMain $ []
-     -- ++ whnfVsNFBenchmarks
+        ++ whnfVsNFBenchmarks
         ++ vectorBenchmarks
+        ++ differenceListBenchmarks
+        ++ queueBenchmarks
