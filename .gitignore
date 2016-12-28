@@ -1,6 +1,11 @@
+*.aux
 *.hi
+*.hp
 *.o
 *.pdf
-.hs-tags
+*.prof
+*.ps
 *.stack-work
 .DS_Store
+.hs-tags
+Profiling
