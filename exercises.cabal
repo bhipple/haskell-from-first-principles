@@ -20,6 +20,7 @@ library
                      , Ch26_monad_transformers
                      , Ch27_non_strictness
                      , Ch28_basic_libraries
+                     , Ch29_io
                      , GitTest
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
@@ -28,6 +29,8 @@ library
                      , bytestring
                      , containers
                      , criterion
+                     , directory
+                     , filepath
                      , gitlib
                      , gitlib-libgit2
                      , hit
@@ -35,6 +38,7 @@ library
                      , hspec
                      , parsers
                      , primitive
+                     , random
                      , raw-strings-qq
                      , scotty
                      , text
