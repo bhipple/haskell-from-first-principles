@@ -21,6 +21,7 @@ library
                      , Ch27_non_strictness
                      , Ch28_basic_libraries
                      , Ch29_io
+                     , Ch30_when_things_go_wrong
                      , GitTest
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
