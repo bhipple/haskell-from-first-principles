@@ -16,4 +16,13 @@ logAndEcho sock = forever $ do
 
 main :: IO ()
 main = withSocketsDo $ do
-        return () 
+    addrinfos <- getAddrInfo
+                    (Just (defaultHints { addrFlags = [AI_PASSIVE]}))
+                    Nothing
+                    (Just "79")
+    let serveraddr = head addrinfos
+    sock <- socket (addrFamily serveraddr) Stream defaultProtocol
+    bindSocket sock (addrAddress serveraddr)
+    listen sock 1
+    logAndEcho sock
+    sClose sock
